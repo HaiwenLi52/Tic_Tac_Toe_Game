@@ -31,6 +31,7 @@
             margin-top: 20px;
             padding: 10px;
             border: 1px solid #ccc;
+            display: none;
         }
     </style>
 </head>
@@ -40,7 +41,7 @@
     <p id="status"></p>
     <button onclick="resetGame()">Reset Game</button>
     
-    <div class="analytics">
+    <div class="analytics" id="analytics">
         <h2>Game Analytics</h2>
         <p>Player X:</p>
         <ul>
@@ -71,6 +72,7 @@
 
         const board = document.getElementById('board');
         const status = document.getElementById('status');
+        const analyticsDiv = document.getElementById('analytics');
 
         // Create board
         for (let i = 0; i < 361; i++) {
@@ -151,9 +153,11 @@
                 if (checkWin()) {
                     status.textContent = `Player ${currentPlayer} wins!`;
                     gameActive = false;
+                    analyticsDiv.style.display = 'block';
                 } else if (gameBoard.every(cell => cell !== '')) {
                     status.textContent = "It's a draw!";
                     gameActive = false;
+                    analyticsDiv.style.display = 'block';
                 } else {
                     currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
                     status.textContent = `Player ${currentPlayer}'s turn`;
@@ -233,6 +237,7 @@
             document.querySelectorAll('.cell').forEach(cell => {
                 cell.textContent = '';
             });
+            analyticsDiv.style.display = 'none';
             updateAnalytics();
         }
 
