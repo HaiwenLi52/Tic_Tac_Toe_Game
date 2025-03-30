@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<!-- Gomoku Game -->
+<!-- Gomoku -->
+
+<!-- Gomoku/Five in a Row Game - 19x19 board with 5-in-a-row win condition -->
+<!-- Gomoku/Five in a Row Game - 19x19 board with 5-in-a-row win condition -->
+<html>
+<head>
+    <title>Gomoku</title>
+    <style>
+        .board {
+            display: grid;
+            grid-template-columns: repeat(19, 40px);
+            width: fit-content;
+        }
+        .cell {
+            width: 40px;
+            height: 40px;
+            background-color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+            border: 1px solid #333;
+        }
+        .cell:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gomoku</h1>
+    <div class="board" id="board"></div>
+    <p id="status"></p>
+    <button onclick="resetGame()">Reset Game</button>
+
+    <script>
+        let currentPlayer = 'X';
+        let gameBoard = Array(361).fill('');
+        let gameActive = true;
+
+        const board = document.getElementById('board');
+        const status = document.getElementById('status');
+
+        // Create board
+        for (let i = 0; i < 361; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.setAttribute('data-index', i);
+            cell.addEventListener('click', handleCellClick);
+            board.appendChild(cell);
+        }
+
+        function handleCellClick(e) {
+            const index = e.target.getAttribute('data-index');
+            
+            if (gameBoard[index] === '' && gameActive) {
+                gameBoard[index] = currentPlayer;
+                e.target.textContent = currentPlayer;
+                
+                if (checkWin()) {
+                    status.textContent = `Player ${currentPlayer} wins!`;
+                    gameActive = false;
+                } else if (gameBoard.every(cell => cell !== '')) {
+                    status.textContent = "It's a draw!";
+                    gameActive = false;
+                } else {
+                    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+                    status.textContent = `Player ${currentPlayer}'s turn`;
+                }
+            }
+        }
+
+        function checkWin() {
+            // Check horizontal, vertical and diagonal lines for 5 in a row
+            const size = 19;
+            const index = gameBoard.lastIndexOf(currentPlayer);
+            const row = Math.floor(index / size);
+            const col = index % size;
+
+            // Check horizontal
+            for (let i = Math.max(0, col - 4); i <= Math.min(col, size - 5); i++) {
+                let win = true;
+                for (let j = 0; j < 5; j++) {
+                    if (gameBoard[row * size + i + j] !== currentPlayer) {
+                        win = false;
+                        break;
+                    }
+                }
+                if (win) return true;
+            }
+
+            // Check vertical
+            for (let i = Math.max(0, row - 4); i <= Math.min(row, size - 5); i++) {
+                let win = true;
+                for (let j = 0; j < 5; j++) {
+                    if (gameBoard[(i + j) * size + col] !== currentPlayer) {
+                        win = false;
+                        break;
+                    }
+                }
+                if (win) return true;
+            }
+
+            // Check diagonal (top-left to bottom-right)
+            for (let i = -4; i <= 0; i++) {
+                if (row + i < 0 || col + i < 0 || row + i + 4 >= size || col + i + 4 >= size) continue;
+                let win = true;
+                for (let j = 0; j < 5; j++) {
+                    if (gameBoard[(row + i + j) * size + (col + i + j)] !== currentPlayer) {
+                        win = false;
+                        break;
+                    }
+                }
+                if (win) return true;
+            }
+
+            // Check diagonal (top-right to bottom-left)
+            for (let i = -4; i <= 0; i++) {
+                if (row + i < 0 || col - i >= size || row + i + 4 >= size || col - i - 4 < 0) continue;
+                let win = true;
+                for (let j = 0; j < 5; j++) {
+                    if (gameBoard[(row + i + j) * size + (col - i - j)] !== currentPlayer) {
+                        win = false;
+                        break;
+                    }
+                }
+                if (win) return true;
+            }
+
+            return false;
+        }
+
+        function resetGame() {
+            gameBoard = Array(361).fill('');
+            gameActive = true;
+            currentPlayer = 'X';
+            status.textContent = `Player ${currentPlayer}'s turn`;
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.textContent = '';
+            });
+        }
+
+        // Initialize game status
+        status.textContent = `Player ${currentPlayer}'s turn`;
+    </script>
+</body>
+</html>
