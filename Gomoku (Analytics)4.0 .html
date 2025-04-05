@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<!-- Gomoku Game -->
+<!-- Gomoku -->
+
+<!-- Gomoku/Five in a Row Game - 19x19 board with 5-in-a-row win condition -->
+<!-- Gomoku/Five in a Row Game - 19x19 board with 5-in-a-row win condition -->
+<html>
+<head>
+    <title>Gomoku</title>
+    <style>
+        .board {
+            display: grid;
+            grid-template-columns: repeat(19, 40px);
+            width: fit-content;
+            float: left;
+        }
+        .cell {
+            width: 40px;
+            height: 40px;
+            background-color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+            border: 1px solid #333;
+        }
+        .cell:hover {
+            background-color: #f0f0f0;
+        }
+        .analytics {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            display: none;
+        }
+        .move-controls {
+            clear: both;
+            padding: 20px 0;
+        }
+        .arrow-btn {
+            font-size: 24px;
+            margin: 0 10px;
+            cursor: pointer;
+        }
+        .move-quality {
+            float: left;
+            margin-left: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            min-width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gomoku</h1>
+    <div class="board" id="board"></div>
+    <div class="move-quality" id="moveQuality">
+        <h3>Move Quality</h3>
+        <p id="qualityText">No moves yet</p>
+        <p id="qualityExplanation"></p>
+    </div>
+    <div class="move-controls">
+        <button class="arrow-btn" onclick="showPreviousMove()">←</button>
+        <button class="arrow-btn" onclick="showNextMove()">→</button>
+    </div>
+    <p id="status"></p>
+    <button onclick="resetGame()">Reset Game</button>
+    
+    <div class="analytics" id="analytics">
+        <h2>Game Analytics</h2>
+        <p>Player X:</p>
+        <ul>
+            <li>Missed Wins: <span id="x-missed-wins">0</span></li>
+            <li>Mistakes: <span id="x-mistakes">0</span></li>
+            <li>Very Bad Mistakes: <span id="x-bad-mistakes">0</span></li>
+            <li>Good Moves: <span id="x-good-moves">0</span></li>
+            <li>Very Good Moves: <span id="x-very-good-moves">0</span></li>
+        </ul>
+        <p>Player O:</p>
+        <ul>
+            <li>Missed Wins: <span id="o-missed-wins">0</span></li>
+            <li>Mistakes: <span id="o-mistakes">0</span></li>
+            <li>Very Bad Mistakes: <span id="o-bad-mistakes">0</span></li>
+            <li>Good Moves: <span id="o-good-moves">0</span></li>
+            <li>Very Good Moves: <span id="o-very-good-moves">0</span></li>
+        </ul>
+    </div>
+
+    <script>
+        let currentPlayer = 'X';
+        let gameBoard = Array(361).fill('');
+        let gameActive = true;
+        let analytics = {
+            X: {missedWins: 0, mistakes: 0, badMistakes: 0, goodMoves: 0, veryGoodMoves: 0},
+            O: {missedWins: 0, mistakes: 0, badMistakes: 0, goodMoves: 0, veryGoodMoves: 0}
+        };
+        let moveHistory = [];
+        let currentMoveIndex = -1;
+        let moveQualities = [];
+        let moveExplanations = [];
+
+        const board = document.getElementById('board');
+        const status = document.getElementById('status');
+        const analyticsDiv = document.getElementById('analytics');
+        const qualityText = document.getElementById('qualityText');
+        const qualityExplanation = document.getElementById('qualityExplanation');
+
+        // Create board
+        for (let i = 0; i < 361; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.setAttribute('data-index', i);
+            cell.addEventListener('click', handleCellClick);
+            board.appendChild(cell);
+        }
+
+        function updateAnalytics() {
+            document.getElementById('x-missed-wins').textContent = analytics.X.missedWins;
+            document.getElementById('x-mistakes').textContent = analytics.X.mistakes;
+            document.getElementById('x-bad-mistakes').textContent = analytics.X.badMistakes;
+            document.getElementById('x-good-moves').textContent = analytics.X.goodMoves;
+            document.getElementById('x-very-good-moves').textContent = analytics.X.veryGoodMoves;
+            
+            document.getElementById('o-missed-wins').textContent = analytics.O.missedWins;
+            document.getElementById('o-mistakes').textContent = analytics.O.mistakes;
+            document.getElementById('o-bad-mistakes').textContent = analytics.O.badMistakes;
+            document.getElementById('o-good-moves').textContent = analytics.O.goodMoves;
+            document.getElementById('o-very-good-moves').textContent = analytics.O.veryGoodMoves;
+        }
+
+        function getMoveQuality(index) {
+            let quality = "Normal move";
+            let explanation = "This is a standard move with no particular advantages or disadvantages.";
+            
+            if (analytics[currentPlayer].missedWins > 0) {
+                quality = "Missed win opportunity";
+                explanation = "There was a winning move available that wasn't taken.";
+            } else if (analytics[currentPlayer].badMistakes > 0) {
+                quality = "Very bad mistake";
+                explanation = "This move missed a winning opportunity and could lead to a disadvantageous position.";
+            } else if (analytics[currentPlayer].veryGoodMoves > 0) {
+                quality = "Very good move";
+                explanation = "This move prevented the opponent from winning on their next turn.";
+            } else if (analytics[currentPlayer].goodMoves > 0) {
+                quality = "Good move";
+                explanation = "This move created multiple threats and increases winning chances.";
+            }
+            return {quality, explanation};
+        }
+
+        function analyzeMove(index) {
+            // Reset counters before analysis
+            analytics[currentPlayer].missedWins = 0;
+            analytics[currentPlayer].badMistakes = 0;
+            analytics[currentPlayer].veryGoodMoves = 0;
+            analytics[currentPlayer].goodMoves = 0;
+
+            // Check if there was a winning move available
+            for (let i = 0; i < 361; i++) {
+                if (gameBoard[i] === '') {
+                    gameBoard[i] = currentPlayer;
+                    if (checkWin()) {
+                        if (i !== parseInt(index)) {
+                            analytics[currentPlayer].missedWins++;
+                            if (index !== undefined) {
+                                analytics[currentPlayer].badMistakes++;
+                            }
+                        }
+                    }
+                    gameBoard[i] = '';
+                }
+            }
+
+            // Check if move prevents opponent's win
+            const opponent = currentPlayer === 'X' ? 'O' : 'X';
+            gameBoard[index] = opponent;
+            if (checkWin()) {
+                analytics[currentPlayer].veryGoodMoves++;
+            }
+            gameBoard[index] = currentPlayer;
+
+            // Check if move creates a threat
+            let threatCount = 0;
+            for (let i = 0; i < 361; i++) {
+                if (gameBoard[i] === '') {
+                    gameBoard[i] = currentPlayer;
+                    if (checkWin()) {
+                        threatCount++;
+                    }
+                    gameBoard[i] = '';
+                }
+            }
+            
+            if (threatCount >= 2) {
+                analytics[currentPlayer].goodMoves++;
+            }
+            
+            const {quality, explanation} = getMoveQuality(index);
+            moveQualities.push(quality);
+            moveExplanations.push(explanation);
+            qualityText.textContent = `${currentPlayer}'s move: ${quality}`;
+            qualityExplanation.textContent = explanation;
+            
+            updateAnalytics();
+        }
+
+        function showPreviousMove() {
+            if (currentMoveIndex > 0) {
+                currentMoveIndex--;
+                renderBoard(currentMoveIndex);
+                qualityText.textContent = `${moveHistory[currentMoveIndex].player}'s move: ${moveQualities[currentMoveIndex]}`;
+                qualityExplanation.textContent = moveExplanations[currentMoveIndex];
+            }
+        }
+
+        function showNextMove() {
+            if (currentMoveIndex < moveHistory.length - 1) {
+                currentMoveIndex++;
+                renderBoard(currentMoveIndex);
+                qualityText.textContent = `${moveHistory[currentMoveIndex].player}'s move: ${moveQualities[currentMoveIndex]}`;
+                qualityExplanation.textContent = moveExplanations[currentMoveIndex];
+            }
+        }
+
+        function renderBoard(moveIndex) {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => cell.textContent = '');
+            
+            for (let i = 0; i <= moveIndex; i++) {
+                const move = moveHistory[i];
+                cells[move.index].textContent = move.player;
+            }
+        }
+
+        function handleCellClick(e) {
+            const index = e.target.getAttribute('data-index');
+            
+            if (gameBoard[index] === '' && gameActive) {
+                gameBoard[index] = currentPlayer;
+                e.target.textContent = currentPlayer;
+                
+                moveHistory = moveHistory.slice(0, currentMoveIndex + 1);
+                moveHistory.push({index: parseInt(index), player: currentPlayer});
+                currentMoveIndex++;
+                
+                analyzeMove(index);
+                
+                if (checkWin()) {
+                    status.textContent = `Player ${currentPlayer} wins!`;
+                    gameActive = false;
+                    analyticsDiv.style.display = 'block';
+                    document.getElementById('moveQuality').style.display = 'block';
+                } else if (gameBoard.every(cell => cell !== '')) {
+                    status.textContent = "It's a draw!";
+                    gameActive = false;
+                    analyticsDiv.style.display = 'block';
+                    document.getElementById('moveQuality').style.display = 'block';
+                } else {
+                    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+                    status.textContent = `Player ${currentPlayer}'s turn`;
+                }
+            }
+        }
+
+        function checkWin() {
+            // Check horizontal, vertical and diagonal lines for 5 in a row
+            const size = 19;
+            const index = gameBoard.lastIndexOf(currentPlayer);
+            const row = Math.floor(index / size);
+            const col = index % size;
+
+            // Check horizontal
+            for (let i = Math.max(0, col - 4); i <= Math.min(col, size - 5); i++) {
+                let win = true;
+                for (let j = 0; j < 5; j++) {
+                    if (gameBoard[row * size + i + j] !== currentPlayer) {
+                        win = false;
+                        break;
+                    }
+                }
+                if (win) return true;
+            }
+
+            // Check vertical
+            for (let i = Math.max(0, row - 4); i <= Math.min(row, size - 5); i++) {
+                let win = true;
+                for (let j = 0; j < 5; j++) {
+                    if (gameBoard[(i + j) * size + col] !== currentPlayer) {
+                        win = false;
+                        break;
+                    }
+                }
+                if (win) return true;
+            }
+
+            // Check diagonal (top-left to bottom-right)
+            for (let i = -4; i <= 0; i++) {
+                if (row + i < 0 || col + i < 0 || row + i + 4 >= size || col + i + 4 >= size) continue;
+                let win = true;
+                for (let j = 0; j < 5; j++) {
+                    if (gameBoard[(row + i + j) * size + (col + i + j)] !== currentPlayer) {
+                        win = false;
+                        break;
+                    }
+                }
+                if (win) return true;
+            }
+
+            // Check diagonal (top-right to bottom-left)
+            for (let i = -4; i <= 0; i++) {
+                if (row + i < 0 || col - i >= size || row + i + 4 >= size || col - i - 4 < 0) continue;
+                let win = true;
+                for (let j = 0; j < 5; j++) {
+                    if (gameBoard[(row + i + j) * size + (col - i - j)] !== currentPlayer) {
+                        win = false;
+                        break;
+                    }
+                }
+                if (win) return true;
+            }
+
+            return false;
+        }
+
+        function resetGame() {
+            gameBoard = Array(361).fill('');
+            gameActive = true;
+            currentPlayer = 'X';
+            moveHistory = [];
+            moveQualities = [];
+            moveExplanations = [];
+            currentMoveIndex = -1;
+            analytics = {
+                X: {missedWins: 0, mistakes: 0, badMistakes: 0, goodMoves: 0, veryGoodMoves: 0},
+                O: {missedWins: 0, mistakes: 0, badMistakes: 0, goodMoves: 0, veryGoodMoves: 0}
+            };
+            status.textContent = `Player ${currentPlayer}'s turn`;
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.textContent = '';
+            });
+            analyticsDiv.style.display = 'none';
+            qualityText.textContent = 'No moves yet';
+            qualityExplanation.textContent = '';
+            updateAnalytics();
+        }
+
+        // Initialize game status
+        status.textContent = `Player ${currentPlayer}'s turn`;
+    </script>
+</body>
+</html>
